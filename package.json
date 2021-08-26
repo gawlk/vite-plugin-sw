@@ -1,0 +1,17 @@
+{
+  "name": "vite-plugin-sw",
+  "version": "0.1.0",
+  "license": "MIT",
+  "author": {
+    "name": "Kevin Gawlik (gawlk)",
+    "url": "https://github.com/gawlk"
+  },
+  "main": "index.js",
+  "types": "index.d.ts",
+  "dependencies": {
+    "replace-in-file": "^6.2.0"
+  },
+  "peerDependencies": {
+    "vite": "^2.5.0"
+  }
+}
