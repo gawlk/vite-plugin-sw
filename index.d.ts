@@ -3,18 +3,6 @@ import { Plugin } from 'vite'
 export declare interface Options {
   /**
    * Path to index
-   * @default 'index.html'
-   */
-  indexPath?: string
-
-  /**
-   * Path to index
-   * @default 'dist'
-   */
-  buildPath?: string
-
-  /**
-   * Path to index
    * @default {
    *  onlineFirst: "[ '/api/' ]",
    *  onlineOnly: "[ 'http://' ]",
@@ -33,7 +21,7 @@ export declare interface Options {
    * Show logs of the service worker
    * @default false
    */
-  showLogs: boolean
+  verbose: boolean
 }
 
 declare function sw(options?: Options): Plugin

@@ -25,57 +25,21 @@ const swr = async () => {
 swr()  
 `
 
-function getFilesToCache(indexPath, buildPath) {
-  const skip = []
-
-  const flatDeep = (arr) =>
-    arr.reduce(
-      (acc, val) => acc.concat(Array.isArray(val) ? flatDeep(val) : val),
-      []
-    )
-
-  const tree = (root) =>
-    fs
-      .readdirSync(root, { withFileTypes: true })
-      .filter(
-        (element) =>
-          !skip.includes(element.name) && !element.name.endsWith('.map')
-      )
-      .map((element) =>
-        element.isDirectory()
-          ? tree(`${root}/${element.name}`)
-          : `${root}/${element.name}`
-      )
-
-  const listAllFiles = flatDeep(
-    fs
-      .readdirSync(buildPath, { withFileTypes: true })
-      .filter((dir) => dir.isDirectory() && !skip.includes(dir.name))
-      .map((dir) => tree(`${buildPath}/${dir.name}`))
-  ).map((path) => path.substring(buildPath.length))
-
-  return ['/', `/${indexPath}`, ...listAllFiles]
-}
-
-function genSWFiles(indexPath, buildPath, regexes, showLogs) {
+function genSWFiles(config) {
   fs.writeFile(`dist/swr.js`, swrText, (error) => {
     if (error) {
       console.error(error)
     }
   })
 
-  fs.writeFile(
-    `dist/sw.js`,
-    genSWText(getFilesToCache(indexPath, buildPath), regexes, showLogs),
-    (error) => {
-      if (error) {
-        console.error(error)
-      }
+  fs.writeFile(`dist/sw.js`, genSWText(config), (error) => {
+    if (error) {
+      console.error(error)
     }
-  )
+  })
 
   replace({
-    files: './dist/index.html',
+    files: `./dist/index.html`,
     from: '</head>',
     to: '<script defer src="/swr.js"></script>\n    </head>',
   }).catch((error) => {
@@ -83,19 +47,22 @@ function genSWFiles(indexPath, buildPath, regexes, showLogs) {
   })
 }
 
-function genSWText(filesToPreCache, regexes = {}, showLogs = false) {
-  const comment = showLogs ? '' : '// '
+function genSWText(config) {
+  const filesToPreCache = getFilesToCache()
+
+  const comment = config.verbose ? '' : '// '
 
   return `
-const regexesOnlineFirst = ${regexes.onlineFirst || "[ '/api/' ]"}
-    
-const regexesOnlineOnly = ${regexes.onlineOnly || "[ 'http://' ]"}
-
-const regexesCacheFirst = ${
-    regexes.cacheFirst || "[ self.location.origin, 'cdn' ]"
+const regexes = ${
+    config.regexes
+      ? JSON.stringify(config.regexes, null, 2)
+      : `{
+  onlineFirst: ['/api/'],
+  onlineOnly: ['http://'],
+  cacheFirst: [self.location.origin, 'cdn'],
+  cacheOnly: [],
+}`
   }
-
-const regexesCacheOnly = ${regexes.cacheOnly || '[]'}
 
 // If the url doesn't match any of those regexes, it will do online first
 
@@ -205,6 +172,38 @@ self.addEventListener('fetch', (event) => {
   )
 })
 `
+}
+
+function getFilesToCache() {
+  const skip = []
+
+  const flatDeep = (arr) =>
+    arr.reduce(
+      (acc, val) => acc.concat(Array.isArray(val) ? flatDeep(val) : val),
+      []
+    )
+
+  const tree = (root) =>
+    fs
+      .readdirSync(root, { withFileTypes: true })
+      .filter(
+        (element) =>
+          !skip.includes(element.name) && !element.name.endsWith('.map')
+      )
+      .map((element) =>
+        element.isDirectory()
+          ? tree(`${root}/${element.name}`)
+          : `${root}/${element.name}`
+      )
+
+  const listAllFiles = flatDeep(
+    fs
+      .readdirSync('dist', { withFileTypes: true })
+      .filter((dir) => dir.isDirectory() && !skip.includes(dir.name))
+      .map((dir) => tree(`dist/${dir.name}`))
+  ).map((path) => path.substring('dist'.length))
+
+  return ['/', `/index.html`, ...listAllFiles]
 }
 
 module.exports = {
