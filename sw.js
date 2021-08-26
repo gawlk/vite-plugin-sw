@@ -26,17 +26,15 @@ swr()
 `
 
 function genSWFiles(config) {
-  fs.writeFile(`dist/swr.js`, swrText, (error) => {
+  const error = (error) => {
     if (error) {
       console.error(error)
     }
-  })
+  }
 
-  fs.writeFile(`dist/sw.js`, genSWText(config), (error) => {
-    if (error) {
-      console.error(error)
-    }
-  })
+  fs.writeFile(`dist/swr.js`, swrText, error)
+
+  fs.writeFile(`dist/sw.js`, genSWText(config), error)
 
   replace({
     files: `./dist/index.html`,
