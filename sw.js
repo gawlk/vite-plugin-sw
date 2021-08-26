@@ -52,8 +52,7 @@ function genSWText(config) {
 
   const comment = config.verbose ? '' : '// '
 
-  return `
-const regexes = ${
+  return `const regexes = ${
     config.regexes
       ? JSON.stringify(config.regexes, null, 2)
       : `{
