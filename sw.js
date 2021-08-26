@@ -84,7 +84,7 @@ function genSWFiles(indexPath, buildPath, regexes, showLogs) {
 }
 
 function genSWText(filesToPreCache, regexes = {}, showLogs = false) {
-  const comment = showLogs ? '// ' : ''
+  const comment = showLogs ? '' : '// '
 
   return `
 const regexesOnlineFirst = ${regexes.onlineFirst || "[ '/api/' ]"}
