@@ -5,7 +5,7 @@ function swPlugin(config = {}) {
     name: 'sw',
 
     closeBundle() {
-      sw.genSWFiles(config)
+      sw.genFiles(config)
     },
   }
 }

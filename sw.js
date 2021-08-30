@@ -1,83 +1,102 @@
 const fs = require('fs')
 const replace = require('replace-in-file')
 
-const packageJson = require('./package.json')
+let verbose = false
 
-const swrText = `
-const swr = async () => {
-  if (navigator.serviceWorker) {
-    if (window.location.protocol === 'https:') {
-      navigator.serviceWorker.register('/sw.js')
-    } else {
-      const registrations = await navigator.serviceWorker.getRegistrations()
+const log = (text) => `${(verbose ? '' : '// ') + 'console.log(' + text + ')'}`
 
-      if (registrations.length > 0) {
-        registrations.forEach((registration) => {
-          registration.unregister()
-        })
+function genFiles(config) {
+  verbose = config.verbose
 
-        location.reload()
-      }
-    }
-  }
-}
-
-swr()  
-`
-
-function genSWFiles(config) {
   const error = (error) => {
     if (error) {
       console.error(error)
     }
   }
 
-  fs.writeFile(`dist/swr.js`, swrText, error)
+  fs.writeFile(`dist/swr.js`, getSWRText(config), error)
 
-  fs.writeFile(`dist/sw.js`, genSWText(config), error)
+  fs.writeFile(`dist/sw.js`, getSWText(config), error)
 
   replace({
     files: `./dist/index.html`,
     from: '</head>',
-    to: '<script defer src="/swr.js"></script>\n    </head>',
+    to: '  <script defer src="/swr.js"></script>\n  </head>',
   }).catch((error) => {
     console.error('Error occurred:', error)
   })
 }
 
-function genSWText(config) {
+function getSWRText(config) {
+  return `const swr = async () => {
+    if (navigator.serviceWorker) {
+      ${log("'swr: browser supports sw'")}
+
+      if (window.location.protocol === 'https:') {
+        ${log("'swr: registering sw'")}
+
+        navigator.serviceWorker.register('/sw.js')
+      } else {
+        ${log("'swr: not https - cleaning sw'")}
+
+        const registrations = await navigator.serviceWorker.getRegistrations()
+  
+        if (registrations.length > 0) {
+          registrations.forEach((registration) => {
+            registration.unregister()
+          })
+  
+          location.reload()
+        }
+      }
+    } else {
+      ${log("'swr: browser does not support sw'")}
+    }
+  }
+  
+  swr()  
+  `
+}
+
+function getSWText(config) {
   const filesToPreCache = getFilesToCache()
 
-  const comment = config.verbose ? '' : '// '
+  const filterToString = (filterName, defaultStr) =>
+    config.filters?.[filterName]?.length > 0
+      ? `'${config.filters[filterName].join("', '")}'`
+      : defaultStr
+      ? `'${defaultStr}'`
+      : ''
 
-  return `const regexes = ${
-    config.regexes
-      ? JSON.stringify(config.regexes, null, 2)
-      : `{
-  onlineFirst: ['/api/'],
-  onlineOnly: ['http://'],
-  cacheFirst: [self.location.origin, 'cdn'],
-  cacheOnly: [],
-}`
-  }
+  return `// Ordered by priority
+const filters = {
+  onlineOnly: [${filterToString('onlineOnly', 'http://')}],
+  cacheOnly: [${filterToString('cacheOnly')}],
+  onlineFirst: [${filterToString('onlineFirst', '/api/')}],
+  cacheFirst: [${filterToString('cacheFirst', 'cdn')}],
+}
 
-// If the url doesn't match any of those regexes, it will do online first
+filters.cacheFirst.push(self.location.origin)
 
-const cacheName = 'cache-${packageJson.name}-${Date.now()}'
+// If the url doesn't match any of those filters, it will do online only
+
+const cacheName = 'swc-${Date.now() + Math.floor(Math.random() * 1000)}'
 
 const filesToPreCache = [
 ${filesToPreCache.map((x) => "  '" + x + "'").join(',\n')}
 ]
 
-${comment}console.log('sw: origin:', self.location.origin)
+${log("'sw: origin:', self.location.origin")}
 
 self.addEventListener('install', (event) => {
-  ${comment}console.log('sw: install')
+  ${log("'sw: install'")}
+
   event.waitUntil(
     caches
       .open(cacheName)
       .then((cache) => {
-        ${comment}console.log('sw: creating cache:', cacheName)
+        ${log("'sw: creating cache:', cacheName")}
+
         return cache.addAll(filesToPreCache)
       })
       .then(() => {
@@ -87,13 +106,15 @@ self.addEventListener('install', (event) => {
 })
 
 self.addEventListener('activate', (event) => {
-  ${comment}console.log('sw: activate')
+  ${log("'sw: activate'")}
+
   event.waitUntil(
     caches.keys().then((cacheNames) => {
       return Promise.all(
         cacheNames.map((thisCacheName) => {
-          if (thisCacheName !== cacheName) {
-            ${comment}console.log('sw: deleting:', thisCacheName)
+          if (thisCacheName !== cacheName && thisCacheName.startsWith('swc-')) {
+            ${log("'sw: deleting:', thisCacheName")}
+
             return caches.delete(thisCacheName)
           }
         })
@@ -117,54 +138,62 @@ const update = (event, cache) => {
     })
 }
 
-const cacheFirst = {
-  method: (event, cache) => {
-    ${comment}console.log('sw: fetch: cache first:', event.request.url)
-    const fun = update(event, cache)
-    return cache || fun
+const onlineOnly = {
+  method: (event) => {
+    ${log("'sw: fetch: online only:', event.request.url")}
+
+    return fetch(event.request)
   },
-  regexes: regexesCacheFirst,
+  filters: filters.onlineOnly,
 }
 
 const cacheOnly = {
   method: (event, cache) => {
-    ${comment}console.log('sw: fetch: cache only:', event.request.url)
+    ${log("'sw: fetch: cache only:', event.request.url")}
+
     return cache || update(event, cache)
   },
-  regexes: regexesCacheOnly,
+  filters: filters.cacheOnly,
 }
 
 const onlineFirst = {
   method: (event, cache) => {
-    ${comment}console.log('sw: fetch: online first:', event.request.url)
+    ${log("'sw: fetch: online first:', event.request.url")}
+
     return update(event, cache)
   },
-  regexes: regexesOnlineFirst,
+  filters: filters.onlineFirst,
 }
 
-const onlineOnly = {
-  method: (event) => {
-    ${comment}console.log('sw: fetch: online only:', event.request.url)
-    return fetch(event.request)
+const cacheFirst = {
+  method: (event, cache) => {
+    ${log("'sw: fetch: cache first:', event.request.url")}
+
+    const fun = update(event, cache)
+    return cache || fun
   },
-  regexes: regexesOnlineOnly,
+  filters: filters.cacheFirst,
 }
 
 self.addEventListener('fetch', (event) => {
   event.respondWith(
     caches.match(event.request).then((cache) => {
-      // The order matters !
-      const patterns = [cacheFirst, cacheOnly, onlineFirst, onlineOnly]
+      const patterns = [
+        onlineOnly,
+        cacheOnly,
+        onlineFirst,
+        cacheFirst
+      ]
 
       for (let pattern of patterns) {
-        for (let regex of pattern.regexes) {
-          if (RegExp(regex).test(event.request.url)) {
+        for (let filter of pattern.filters) {
+          if (event.request.url.includes(filter)) {
             return pattern.method(event, cache)
           }
         }
       }
 
-      return onlineFirst.method(event, cache)
+      return onlineOnly.method(event, cache)
     })
   )
 })
@@ -204,5 +233,5 @@ function getFilesToCache() {
 }
 
 module.exports = {
-  genSWFiles,
+  genFiles,
 }

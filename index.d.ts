@@ -2,7 +2,7 @@ import { Plugin } from 'vite'
 
 export declare interface Options {
   /**
-   * Path to index
+   * Filters which determine the fetching method
    * @default {
    *  onlineFirst: "[ '/api/' ]",
    *  onlineOnly: "[ 'http://' ]",
@@ -10,11 +10,11 @@ export declare interface Options {
    *  cacheOnly: "[]",
    * }
    */
-  regexes: {
-    onlineFirst: string[]
+  filters: {
     onlineOnly: string[]
-    cacheFirst: string[]
     cacheOnly: string[]
+    onlineFirst: string[]
+    cacheFirst: string[]
   }
 
   /**
