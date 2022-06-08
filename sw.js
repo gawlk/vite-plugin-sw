@@ -83,7 +83,15 @@ filters.cacheFirst.push(self.location.origin)
 const cacheName = 'swc-${Date.now() + Math.floor(Math.random() * 1000)}'
 
 const filesToPreCache = [
-${filesToPreCache.map((x) => "  '" + x + "'").join(',\n')}
+  ${filesToPreCache
+    .filter(
+      (x) =>
+        !(config.filters.onlineOnly || [])
+          .map((y) => x.includes(y))
+          .includes(true)
+    )
+    .map((x) => "  '" + x + "'")
+    .join(',\n')}
 ]
 
 ${log("'sw: origin:', self.location.origin")}
