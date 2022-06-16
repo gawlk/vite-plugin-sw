@@ -18,6 +18,12 @@ export declare interface Options {
   }
 
   /**
+   * Generate the service worker registrer
+   * @default true
+   */
+  generateRegistrer: boolean
+
+  /**
    * Show logs of the service worker
    * @default false
    */

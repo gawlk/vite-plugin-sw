@@ -1,12 +1,14 @@
 const fs = require('fs')
 const replace = require('replace-in-file')
 
-let verbose = false
+let generateRegistrer
+let verbose
 
 const log = (text) => `${(verbose ? '' : '// ') + 'console.log(' + text + ')'}`
 
 function genFiles(config) {
-  verbose = config.verbose
+  generateRegistrer = config.generateRegistrer ?? true
+  verbose = config.verbose ?? false
 
   const error = (error) => {
     if (error) {
@@ -14,17 +16,19 @@ function genFiles(config) {
     }
   }
 
-  fs.writeFile(`dist/swr.js`, getSWRText(config), error)
-
   fs.writeFile(`dist/sw.js`, getSWText(config), error)
 
-  replace({
-    files: `./dist/index.html`,
-    from: '</head>',
-    to: '  <script defer src="/swr.js"></script>\n  </head>',
-  }).catch((error) => {
-    console.error('Error occurred:', error)
-  })
+  if (generateRegistrer) {
+    fs.writeFile(`dist/swr.js`, getSWRText(config), error)
+
+    replace({
+      files: `./dist/index.html`,
+      from: '</head>',
+      to: '  <script defer src="/swr.js"></script>\n  </head>',
+    }).catch((error) => {
+      console.error('Error occurred:', error)
+    })
+  }
 }
 
 function getSWRText(config) {
@@ -36,6 +40,21 @@ function getSWRText(config) {
         ${log("'swr: registering sw'")}
 
         navigator.serviceWorker.register('/sw.js')
+
+        registration.addEventListener('updatefound', () => {
+          ${log("'swr: update found'")}
+
+          const worker = registration.installing
+
+          worker?.addEventListener('statechange', () => {
+            if (
+              worker.state === 'installed' &&
+              navigator.serviceWorker.controller
+            ) {
+              ${log("'swr: update installed'")}
+            }
+          })
+        })
       } else {
         ${log("'swr: not https - cleaning sw'")}
 
